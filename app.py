@@ -11,7 +11,7 @@ import os
 # ==============================
 # CONFIGURAÇÃO
 # ==============================
-NOME_EMPRESA = "Maria Luiza Transportes"
+NOME_EMPRESA = "Maria Luiza Material de Construção"
 DB_FILE = "controle.db"
 
 st.set_page_config(
