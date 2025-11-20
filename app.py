@@ -11,7 +11,7 @@ import os
 # ==============================
 # CONFIGURAÇÃO
 # ==============================
-NOME_EMPRESA = "Maria Luiza Material de Construção"
+NOME_EMPRESA = "Maria Luiza Transportes"
 DB_FILE = "controle.db"
 
 st.set_page_config(
@@ -77,6 +77,7 @@ def init_database():
             cliente TEXT,
             preco_unitario REAL NOT NULL,
             total_venda REAL NOT NULL,
+            nota_fiscal TEXT,
             forma_pagamento TEXT,
             observacoes TEXT,
             usuario_registro TEXT,
@@ -133,7 +134,9 @@ def init_database():
     cursor.execute("SELECT COUNT(*) FROM produtos")
     if cursor.fetchone()[0] == 0:
         produtos_padrao = [
-
+            ("001", "Brita 1", "m³", 85.00, 20, 50),
+            ("002", "Areia média", "m³", 90.00, 30, 80),
+            ("003", "Saibro", "m³", 70.00, 15, 40)
         ]
         cursor.executemany(
             "INSERT INTO produtos (codigo, descricao, unidade, preco_sugerido, estoque_minimo, estoque_inicial) VALUES (?, ?, ?, ?, ?, ?)",
@@ -204,16 +207,16 @@ def inserir_entrada(data, codigo, descricao, unidade, quantidade, fornecedor,
     conn.close()
 
 def inserir_saida(data, codigo, descricao, unidade, quantidade, cliente,
-                 preco_unit, total, forma_pag, obs, usuario):
+                 preco_unit, total, nf, forma_pag, obs, usuario):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO saidas (data, codigo_produto, descricao_produto, unidade, 
                           quantidade, cliente, preco_unitario, total_venda, 
-                          forma_pagamento, observacoes, usuario_registro)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          nota_fiscal, forma_pagamento, observacoes, usuario_registro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (data, codigo, descricao, unidade, quantidade, cliente,
-          preco_unit, total, forma_pag, obs, usuario))
+          preco_unit, total, nf, forma_pag, obs, usuario))
     conn.commit()
     conn.close()
 
@@ -466,9 +469,9 @@ df_estoque = calcular_estoque_atual()
 # ==============================
 # TABS
 # ==============================
-tab_dash, tab_ent, tab_sai, tab_gas, tab_prod, tab_est, tab_rel = st.tabs([
+tab_dash, tab_ent, tab_sai, tab_gas, tab_prod, tab_est, tab_cmp, tab_rel = st.tabs([
     "📊 Dashboard", "📦 Entradas", "🚚 Saídas", "💸 Gastos",
-    "📋 Produtos", "📦 Estoque", "📈 Relatórios"
+    "📋 Produtos", "📦 Estoque", "🧾 Compras/Vendas (Notas)", "📈 Relatórios"
 ])
 
 # ==================== DASHBOARD ====================
@@ -572,7 +575,12 @@ with tab_ent:
 
             with c3:
                 custo_unit = st.number_input("Custo Unitário (R$)", min_value=0.0, value=0.0, step=0.01)
-                nf = st.text_input("N° Nota Fiscal")
+                tem_nf = st.selectbox("Tem Nota Fiscal?", ["Sim", "Não"])
+                if tem_nf == "Sim":
+                    nf = st.text_input("Número da Nota Fiscal")
+                else:
+                    nf = "SEM NOTA"
+                    st.info("Registrado como: SEM NOTA")
                 forma_pag = st.selectbox("Forma Pagamento", options=FORMAS_PAGAMENTO)
                 obs = st.text_area("Observações", height=60)
 
@@ -593,7 +601,8 @@ with tab_ent:
         for _, row in df_entradas.head(20).iterrows():
             col_data, col_delete = st.columns([10, 1])
             with col_data:
-                st.write(f"**ID {row['id']}** - {row['data']} - {row['descricao_produto']} - R$ {row['custo_total']:.2f}")
+                nota_info = f"NF: {row['nota_fiscal']}" if row['nota_fiscal'] else "SEM NOTA"
+                st.write(f"**ID {row['id']}** - {row['data']} - {row['descricao_produto']} - R$ {row['custo_total']:.2f} - {nota_info}")
             with col_delete:
                 if st.button("🗑️", key=f"del_ent_{row['id']}"):
                     excluir_entrada(row['id'])
@@ -638,6 +647,12 @@ with tab_sai:
 
             with c3:
                 preco_unit = st.number_input("Preço Unitário (R$)", min_value=0.0, value=float(preco_sug), step=0.01)
+                tem_nf = st.selectbox("Tem Nota Fiscal?", ["Sim", "Não"])
+                if tem_nf == "Sim":
+                    nf = st.text_input("Número da Nota Fiscal")
+                else:
+                    nf = "SEM NOTA"
+                    st.info("Registrado como: SEM NOTA")
                 forma_pag = st.selectbox("Forma Pagamento", options=FORMAS_PAGAMENTO)
                 obs = st.text_area("Observações", height=60)
 
@@ -649,7 +664,7 @@ with tab_sai:
                 else:
                     total = qtd * preco_unit
                     inserir_saida(data, cod, desc, unidade, qtd, cliente,
-                                preco_unit, total, forma_pag, obs,
+                                preco_unit, total, nf, forma_pag, obs,
                                 st.session_state.usuario_logado)
                     st.success("✅ Venda registrada!")
                     st.rerun()
@@ -660,7 +675,8 @@ with tab_sai:
         for _, row in df_saidas.head(20).iterrows():
             col_data, col_delete = st.columns([10, 1])
             with col_data:
-                st.write(f"**ID {row['id']}** - {row['data']} - {row['cliente']} - R$ {row['total_venda']:.2f}")
+                nota_info = f"NF: {row['nota_fiscal']}" if 'nota_fiscal' in row and row['nota_fiscal'] else "SEM NOTA"
+                st.write(f"**ID {row['id']}** - {row['data']} - {row['cliente']} - R$ {row['total_venda']:.2f} - {nota_info}")
             with col_delete:
                 if st.button("🗑️", key=f"del_sai_{row['id']}"):
                     excluir_saida(row['id'])
@@ -769,6 +785,105 @@ with tab_est:
         st.markdown(f"### 💰 Valor Total: **R$ {df_estoque['valor_estoque'].sum():,.2f}**")
     else:
         st.info("Sem produtos em estoque.")
+
+# ==================== COMPRAS/VENDAS COM E SEM NOTA ====================
+with tab_cmp:
+    st.header("🧾 Compras e Vendas – Com e Sem Nota Fiscal")
+
+    # Garantir coluna nota_fiscal em entradas
+    df_entradas_aux = df_entradas.copy()
+    if "nota_fiscal" not in df_entradas_aux.columns:
+        df_entradas_aux["nota_fiscal"] = ""
+
+    # Criar flag com/sem nota
+    df_entradas_aux["tem_nota"] = df_entradas_aux["nota_fiscal"].apply(
+        lambda x: "Com nota" if isinstance(x, str) and x.strip() not in ["", "SEM NOTA", "sem nota", "Sem nota"] else "Sem nota"
+    )
+
+    # Garantir coluna nota_fiscal em saídas
+    df_saidas_aux = df_saidas.copy()
+    if "nota_fiscal" not in df_saidas_aux.columns:
+        df_saidas_aux["nota_fiscal"] = ""
+
+    df_saidas_aux["tem_nota"] = df_saidas_aux["nota_fiscal"].apply(
+        lambda x: "Com nota" if isinstance(x, str) and x.strip() not in ["", "SEM NOTA", "sem nota", "Sem nota"] else "Sem nota"
+    )
+
+    # Filtro por período
+    def filtrar_periodo(df, col_data):
+        if df.empty:
+            return df
+        df2 = df.copy()
+        df2[col_data] = pd.to_datetime(df2[col_data]).dt.date
+        return df2[(df2[col_data] >= data_inicial) & (df2[col_data] <= data_final)]
+
+    ent_periodo = filtrar_periodo(df_entradas_aux, "data")
+    sai_periodo = filtrar_periodo(df_saidas_aux, "data")
+
+    col_top1, col_top2 = st.columns(2)
+
+    # ================= COMPRAS (ENTRADAS) =================
+    with col_top1:
+        st.subheader("📥 Compras (Entradas)")
+
+        compras_com_nota = ent_periodo[ent_periodo["tem_nota"] == "Com nota"]
+        compras_sem_nota = ent_periodo[ent_periodo["tem_nota"] == "Sem nota"]
+
+        total_com_nota = compras_com_nota["custo_total"].sum() if not compras_com_nota.empty else 0
+        total_sem_nota = compras_sem_nota["custo_total"].sum() if not compras_sem_nota.empty else 0
+
+        c1, c2 = st.columns(2)
+        c1.metric("Com nota fiscal", f"R$ {total_com_nota:,.2f}")
+        c2.metric("Sem nota fiscal", f"R$ {total_sem_nota:,.2f}")
+
+        df_comp = pd.DataFrame({
+            "Tipo": ["Com nota", "Sem nota"],
+            "Valor": [total_com_nota, total_sem_nota]
+        })
+        fig_comp = px.bar(df_comp, x="Tipo", y="Valor", text="Valor", color="Tipo", color_discrete_sequence=["#3498db", "#e67e22"])
+        fig_comp.update_traces(texttemplate="R$ %{y:,.2f}", textposition="outside")
+        fig_comp.update_layout(height=350, showlegend=False)
+        st.plotly_chart(fig_comp, use_container_width=True)
+
+    # ================= VENDAS (SAÍDAS) =================
+    with col_top2:
+        st.subheader("🚚 Vendas (Saídas)")
+
+        vendas_com_nota = sai_periodo[sai_periodo["tem_nota"] == "Com nota"]
+        vendas_sem_nota = sai_periodo[sai_periodo["tem_nota"] == "Sem nota"]
+
+        total_vendas_com_nota = vendas_com_nota["total_venda"].sum() if not vendas_com_nota.empty else 0
+        total_vendas_sem_nota = vendas_sem_nota["total_venda"].sum() if not vendas_sem_nota.empty else 0
+
+        c1, c2 = st.columns(2)
+        c1.metric("Com nota fiscal", f"R$ {total_vendas_com_nota:,.2f}")
+        c2.metric("Sem nota fiscal", f"R$ {total_vendas_sem_nota:,.2f}")
+
+        df_vend = pd.DataFrame({
+            "Tipo": ["Com nota", "Sem nota"],
+            "Valor": [total_vendas_com_nota, total_vendas_sem_nota]
+        })
+        fig_vend = px.bar(df_vend, x="Tipo", y="Valor", text="Valor", color="Tipo", color_discrete_sequence=["#27ae60", "#e74c3c"])
+        fig_vend.update_traces(texttemplate="R$ %{y:,.2f}", textposition="outside")
+        fig_vend.update_layout(height=350, showlegend=False)
+        st.plotly_chart(fig_vend, use_container_width=True)
+
+    st.markdown("---")
+
+    # ================= ESTOQUE DERIVADO DAS ENTRADAS COM/SEM NOTA =================
+    st.subheader("📦 Estoque ligado a Compras com/sem Nota")
+
+    # Quantidade total comprada com e sem nota por produto
+    if not ent_periodo.empty:
+        comp_por_prod = ent_periodo.groupby(["codigo_produto", "descricao_produto", "unidade", "tem_nota"]).agg({
+            "quantidade": "sum",
+            "custo_total": "sum"
+        }).reset_index()
+        comp_por_prod = comp_por_prod.rename(columns={"quantidade": "qtd_comprada", "custo_total": "valor_comprado"})
+
+        st.dataframe(comp_por_prod, use_container_width=True)
+    else:
+        st.info("Sem compras no período para analisar com/sem nota.")
 
 # ==================== RELATÓRIOS ====================
 with tab_rel:
