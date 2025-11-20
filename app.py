@@ -134,9 +134,7 @@ def init_database():
     cursor.execute("SELECT COUNT(*) FROM produtos")
     if cursor.fetchone()[0] == 0:
         produtos_padrao = [
-            ("001", "Brita 1", "m³", 85.00, 20, 50),
-            ("002", "Areia média", "m³", 90.00, 30, 80),
-            ("003", "Saibro", "m³", 70.00, 15, 40)
+
         ]
         cursor.executemany(
             "INSERT INTO produtos (codigo, descricao, unidade, preco_sugerido, estoque_minimo, estoque_inicial) VALUES (?, ?, ?, ?, ?, ?)",
