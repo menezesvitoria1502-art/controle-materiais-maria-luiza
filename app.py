@@ -85,6 +85,13 @@ def init_database():
         )
     """)
 
+    # Verificar e adicionar coluna nota_fiscal em saidas se não existir
+    cursor.execute("PRAGMA table_info(saidas)")
+    colunas = [col[1] for col in cursor.fetchall()]
+    if "nota_fiscal" not in colunas:
+        cursor.execute("ALTER TABLE saidas ADD COLUMN nota_fiscal TEXT")
+        conn.commit()
+
     # Tabela de gastos
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS gastos (
