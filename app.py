@@ -25,9 +25,18 @@ st.set_page_config(
 # FUNÇÕES DE BANCO DE DADOS
 # ==============================
 def get_connection():
-    """Cria conexão com o banco de dados"""
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-    return conn
+    if USE_POSTGRES:
+        try:
+            engine = create_engine(DATABASE_URL)
+            conn = engine.connect()
+            return conn
+        except Exception as e:
+            # Isso aparece nos logs do Streamlit Cloud
+            print("ERRO AO CONECTAR NO POSTGRES:", e)
+            raise
+    else:
+        return sqlite3.connect(DATABASE_URL, check_same_thread=False)
+
 
 def init_database():
     """Inicializa o banco de dados com as tabelas"""
